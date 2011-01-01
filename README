@@ -1,3 +1,32 @@
+OfflineIMAP Folder Manager
+--------------------------
+
+OfflineIMAP [1] is a fantastic tool written in Python which helps to keep a local copy in sync with
+a remote server via IMAP (and vice versa). Unfortunately, one small problem exists [2].
+
+> How do I add or delete a folder?
+> 
+> OfflineIMAP does not currently provide this feature. However, if you create a new folder on the
+> remote server, OfflineIMAP will detect this and create the corresponding folder locally
+> automatically.
+
+That is quite annoying, since when you create a new folder locally to store mails this will NOT be
+synced to the server. This simple script supports a quick solution for this problem.
 
 
-(C) 2009, Bjoern Rennhak, under an MIT licence. http://www.opensource.org/licenses/mit-license.php
+TODO
+----
+
+Write a proper patch for OfflineIMAP to support this.
+
+
+References
+----------
+
+[1] OfflineIMAP Github Repository, https://github.com/jgoerzen/offlineimap/
+[2] OfflineIMAP FAQ Wiki, https://github.com/jgoerzen/offlineimap/wiki/Frequently-Asked-Questions
+
+License
+-------
+
+(C) 2010, Bjoern Rennhak, under an MIT licence. http://www.opensource.org/licenses/mit-license.php
