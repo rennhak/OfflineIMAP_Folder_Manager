@@ -52,8 +52,10 @@ class OfflineIMAPFolderManager # {{{
 
       # FIXME - These patterns are NG
       @login_pattern             = %r{^Last login.*$}i
-      @prompt_pattern            = %r{^.*root\]%}i
-      @prompt_pattern_vserver    = %r{.*:/#}i
+      # @prompt_pattern            = %r{^.*root\]%}i
+      @prompt_pattern            = /[%|#]/
+      # @prompt_pattern_vserver    = %r{.*:/#}i
+      @prompt_pattern_vserver    = /[%|#]/
 
       @session.writer.sync      = true
 
@@ -69,6 +71,11 @@ class OfflineIMAPFolderManager # {{{
         end # of @options.commands.each 
       end # of unless( @options.commands.nil
 
+      if( @options.create_maildir_directory )
+        base_directory, email_address, create_directory_name, chown_to_user = @options.create_maildir_directory
+        create_maildir_directory( base_directory, email_address, create_directory_name, chown_to_user )
+      end
+
       mailq if( @options.mailq )
 
       logout unless( @session.reader.nil? and @session.writer.nil? )
@@ -82,7 +89,7 @@ class OfflineIMAPFolderManager # {{{
   # = The function mailq checks the Postfix mail queue if there are mails or not.
   def mailq # {{{
     send( @prompt_pattern, "mailq > /tmp/mailq.tmp" )
-
+    sleep 1
     mailq_output = receive( @prompt_pattern, "cat /tmp/mailq.tmp" )
 
     if( mailq_output.include?( "Mail queue is empty" ) )
@@ -103,6 +110,28 @@ class OfflineIMAPFolderManager # {{{
   end # }}}
 
 
+  # = Create MailDir type Directory on Server. This expects that on the server the maildirmake command is available.
+  # @param go_to_directory, create_directory_name, chown_to_user
+  def create_maildir_directory base_directory, email_address, create_directory_name, chown_to_user # {{{
+    message :info, "Create maildir directory called"
+
+    # turn e.g. name@example.com into example.com/name
+    path              = File.join( *( email_address.to_s.split( "@" ).reverse.collect { |i| i.strip } ) )
+
+    sleep 1
+    send( @prompt_pattern, "zsh" )
+    sleep 1
+    send( @prompt_pattern, "cd #{base_directory.to_s}" )
+    sleep 1
+    send( @prompt_pattern, "cd #{path.to_s}" )
+    sleep 1
+    send( @prompt_pattern, "maildirmake #{create_directory_name.to_s}" )
+    sleep 1
+    send( @prompt_pattern, "chown -R #{chown_to_user}: #{create_directory_name.to_s}" )
+    sleep 1
+  end # of def create_directory }}}
+
+
   # = The function 'parse_cmd_arguments' takes a number of arbitrary commandline arguments and parses them into a proper data structure via optparse
   # @param args Ruby's STDIN.ARGS from commandline
   # @returns Ruby optparse package options hash object
@@ -119,7 +148,6 @@ class OfflineIMAPFolderManager # {{{
     options.mailq         = nil
     options.quiet         = false
     options.commands      = []
-
     pristine_options      = options.dup
 
     opts = OptionParser.new do |opts|
@@ -133,7 +161,7 @@ class OfflineIMAPFolderManager # {{{
       #opts.separator "Specific options:"
 
       # Set of arguments
-      opts.on("-r", "--run CMD", "Run this command on server via SSH" ) do |r|
+      opts.on( "-r", "--run CMD", "Run this command on server via SSH" ) do |r|
         options.commands << r
       end
 
@@ -151,7 +179,11 @@ class OfflineIMAPFolderManager # {{{
 
       opts.on( "-m", "--mailq", "Check Postfix Mail Queue (mailq)" ) do |m|
         options.mailq = m
-      end 
+      end
+
+      opts.on( "--create-maildir base_dir, email_address, folder_name, chown_username", Array, "Create MailDir on Server via SSH. Supply: e.g. \"base_dir, email_address, folder_name, chown_username\".\n\t\t\t\t     You might want to start the folder_name with a dot if you use IMAP." ) do |list|
+        options.create_maildir_directory = list
+      end
 
       # Boolean switch.
       opts.on( "", "--verbose", "Run verbosely") do |v|
@@ -345,6 +377,7 @@ class OfflineIMAPFolderManager # {{{
   # @param session OStruct containing the PTY objects @session.reader, @session.writer, @session.pid
   # @returns If output false, returns nothing, if true returns output from second session.reader attempt
   def execute if_pattern, command, output, session = @session # {{{
+    message :debug, "Execute | Pattern (#{if_pattern.to_s}), Command (#{command.to_s})"
     session.reader.expect( if_pattern ) do |o|
       unless( command.nil? )
         session.writer.puts( command )
